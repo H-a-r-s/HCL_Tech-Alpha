@@ -14,7 +14,7 @@ spring:
             - Path=/api/auth/**
 
         - id: product-service
-          uri: http://localhost:8082
+          uri: http://localhost:8089
           predicates:
             - Path=/api/products/**,/api/brands/**,/api/categories/**,/api/admin/**
 
@@ -37,3 +37,22 @@ spring:
           uri: http://localhost:8086
           predicates:
             - Path=/api/v1/notifications/**
+
+#
+#        allowedOrigins:
+#          - "http://localhost:5173"
+#
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - PATCH
+              - OPTIONS
+            allowedHeaders: "*"
+            exposedHeaders: "*"
+            allowCredentials: false
