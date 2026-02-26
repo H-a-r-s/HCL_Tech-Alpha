@@ -18,7 +18,6 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-
 @Configuration
 public class SecurityConfig {
 
@@ -28,38 +27,39 @@ public class SecurityConfig {
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
 
-        // Claim -> ROLE_ converter
         Converter<org.springframework.security.oauth2.jwt.Jwt, Mono<AbstractAuthenticationToken>> authConverter =
                 jwt -> {
-                    String role = jwt.getClaimAsString("role"); // e.g. "USER" or "ADMIN"
-
+                    String role = jwt.getClaimAsString("role"); // USER / ADMIN
                     var authorities = (role == null || role.isBlank())
                             ? List.<SimpleGrantedAuthority>of()
                             : List.of(new SimpleGrantedAuthority("ROLE_" + role));
-
                     return Mono.just(new JwtAuthenticationToken(jwt, authorities, jwt.getSubject()));
                 };
 
         return http
-                .cors(cors -> {})
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
-
+                .cors(cors -> {})
                 .authorizeExchange(ex -> ex
-                        // Public endpoints
-                        .pathMatchers("/auth/**").permitAll()
+                        .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        .pathMatchers("/api/auth/**").permitAll()
                         .pathMatchers("/actuator/**").permitAll()
 
-                        // Complaint public endpoints
-                        .pathMatchers(HttpMethod.POST, "/complaints").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/complaints/track/**").permitAll()
 
-                        // Admin endpoints (Complaint-Service)
-                        .pathMatchers("/admin/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.GET, "/api/products/**", "/api/brands/**", "/api/categories/**").permitAll()
 
-                        // Everything else requires auth
+
+                        .pathMatchers("/api/admin/**").hasRole("ADMIN")
+                        .pathMatchers("/api/admin/inventory/**").hasRole("ADMIN")
+
+                        .pathMatchers("/cart/**").authenticated()
+                        .pathMatchers("/api/orders/**").authenticated()
+                        .pathMatchers("/api/v1/notifications/**").authenticated()
+                        .pathMatchers("/api/inventory/**").authenticated()
+
+
                         .anyExchange().authenticated()
                 )
-
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt
                                 .jwtDecoder(jwtDecoder())

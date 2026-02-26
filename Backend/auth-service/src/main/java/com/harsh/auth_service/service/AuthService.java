@@ -2,86 +2,47 @@ package com.harsh.auth_service.service;
 
 import com.harsh.auth_service.dto.AuthResponse;
 import com.harsh.auth_service.dto.LoginRequest;
-import com.harsh.auth_service.dto.MeResponse;
-import com.harsh.auth_service.dto.SignupRequest;
+import com.harsh.auth_service.dto.RegisterRequest;
 import com.harsh.auth_service.entity.Role;
 import com.harsh.auth_service.entity.User;
 import com.harsh.auth_service.repository.UserRepository;
+import com.harsh.auth_service.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+    private final UserRepository repo;
+    private final BCryptPasswordEncoder encoder;
+    private final JwtUtil jwtUtil;
 
-    public AuthResponse signup(SignupRequest request) {
-
-        if (userRepository.existsByEmail(request.getEmail()))
+    public void register(RegisterRequest request) {
+        if (repo.findByEmail(request.getEmail()).isPresent()) {
             throw new RuntimeException("Email already exists");
+        }
 
         User user = User.builder()
                 .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.USER)
-                .enabled(true)
+                .password(encoder.encode(request.getPassword()))
+                .role("USER")
                 .build();
 
-        userRepository.save(user);
-
-        String token = jwtService.generateToken(user);
-
-        return new AuthResponse(token, user.getRole().name());
+        repo.save(user);
     }
 
     public AuthResponse login(LoginRequest request) {
-
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = repo.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (userRepository.existsByEmail(request.getEmail()))
-            throw new IllegalArgumentException("Email already exists");
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword()))
-            throw new RuntimeException("Invalid email or password");
-        String token = jwtService.generateToken(user);
-
-        return new AuthResponse(token, user.getRole().name());
-    }
-
-    public MeResponse me(User user) {
-        return new MeResponse(user.getEmail(), user.getRole().name());
-    }
-
-    @Value("${auth.allow-admin-signup:false}")
-    private boolean allowAdminSignup;
-
-    public AuthResponse signupAdmin(SignupRequest request) {
-
-        if (!allowAdminSignup) {
-            throw new RuntimeException("Admin signup is disabled");
+        if (!encoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Invalid credentials");
         }
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email already exists");
-        }
-
-        User admin = User.builder()
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.ADMIN)
-                .enabled(true)
-                .build();
-
-        userRepository.save(admin);
-
-        String token = jwtService.generateToken(admin);
-
-        return new AuthResponse(token, admin.getRole().name());
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole());
+        return new AuthResponse(token,user.getRole());
     }
 }
